@@ -1,0 +1,9 @@
+groq
+openai-whisper
+yt-dlp
+opencv-python
+pytesseract
+pillow
+fpdf2
+python-dotenv
+ffmpeg-python
