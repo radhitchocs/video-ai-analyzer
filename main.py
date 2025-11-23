@@ -59,13 +59,13 @@ def analyze_video(video_url: str, output_format: str = "all"):
         # Step 3: Speech-to-text dengan Whisper
         print("\n[3/5] 🎤 Speech-to-Text (Whisper)...")
         try:
-            stt = SpeechToText(model_size="tiny")  # Bisa diganti ke 'small' atau 'medium' untuk akurasi lebih tinggi
+            stt = SpeechToText(model_size="base")  # Bisa diganti ke 'small' atau 'medium' untuk akurasi lebih tinggi
             speech_data = stt.transcribe(audio_path, language="id")
         except Exception as e:
             print(f"\n⚠️  Error saat load Whisper model: {str(e)}")
-            print("\n💡 Mencoba dengan model 'tiny' yang lebih kecil...")
+            print("\n💡 Mencoba dengan model 'base' yang lebih kecil...")
             try:
-                stt = SpeechToText(model_size="tiny")
+                stt = SpeechToText(model_size="base")
                 speech_data = stt.transcribe(audio_path, language="id")
             except Exception as e2:
                 print(f"\n❌ Masih error: {str(e2)}")
