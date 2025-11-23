@@ -8,6 +8,7 @@ except ImportError:
     from fpdf2 import FPDF
 from datetime import datetime
 import os
+import unicodedata
 
 
 class PDFGenerator:
@@ -16,7 +17,64 @@ class PDFGenerator:
         self.pdf = FPDF()
         self.pdf.set_auto_page_break(auto=True, margin=15)
     
-    def create_report_pdf(self, report_text: str, output_path: str, video_info: dict = None):
+    def sanitize_text(self, text: str) -> str:
+        """
+        Bersihkan teks dari karakter Unicode yang tidak didukung oleh font Latin-1
+        Konversi karakter fullwidth dan special Unicode ke ASCII equivalent
+        """
+        if not text:
+            return ""
+        
+        # Mapping karakter fullwidth ke ASCII
+        replacements = {
+            '：': ':',  # Fullwidth colon
+            '｜': '|',  # Fullwidth vertical bar
+            '（': '(',  # Fullwidth left parenthesis
+            '）': ')',  # Fullwidth right parenthesis
+            '，': ',',  # Fullwidth comma
+            '。': '.',  # Fullwidth period
+            '！': '!',  # Fullwidth exclamation
+            '？': '?',  # Fullwidth question mark
+            '【': '[',  # Fullwidth left bracket
+            '】': ']',  # Fullwidth right bracket
+            '「': '"',  # Left corner bracket
+            '」': '"',  # Right corner bracket
+            '『': '"',  # Double left corner bracket
+            '』': '"',  # Double right corner bracket
+            '　': ' ',  # Fullwidth space
+            '－': '-',  # Fullwidth hyphen
+            '～': '~',  # Fullwidth tilde
+            '＃': '#',  # Fullwidth hash
+        }
+        
+        # Terapkan replacements
+        for fullwidth, ascii_char in replacements.items():
+            text = text.replace(fullwidth, ascii_char)
+        
+        # Normalisasi Unicode (NFKD = compatibility decomposition)
+        text = unicodedata.normalize('NFKD', text)
+        
+        # Hilangkan karakter yang tidak bisa di-encode ke latin-1
+        # Coba encode ke latin-1, jika gagal ganti dengan '?'
+        cleaned = ''
+        for char in text:
+            try:
+                char.encode('latin-1')
+                cleaned += char
+            except UnicodeEncodeError:
+                # Coba dapatkan ASCII equivalent
+                ascii_equiv = unicodedata.normalize('NFKD', char).encode('ascii', 'ignore').decode('ascii')
+                if ascii_equiv:
+                    cleaned += ascii_equiv
+                else:
+                    # Jika tidak ada equivalent, skip karakter (atau ganti dengan space jika bukan control char)
+                    if not unicodedata.category(char).startswith('C'):
+                        cleaned += ' '
+        
+        return cleaned
+    
+    def create_report_pdf(self, report_text: str, output_path: str, video_info: dict = None, 
+                          speech_data: list = None, ocr_data: list = None):
         """
         Buat PDF dari laporan teks
         
@@ -24,6 +82,8 @@ class PDFGenerator:
             report_text: Teks laporan
             output_path: Path untuk menyimpan PDF
             video_info: Informasi video (opsional)
+            speech_data: Data transkrip audio (opsional)
+            ocr_data: Data OCR dari video (opsional)
         """
         print(f"📄 Generating PDF: {output_path}")
         
@@ -39,9 +99,11 @@ class PDFGenerator:
             self.pdf.set_font("Arial", "", 10)
             self.pdf.ln(5)
             if "title" in video_info:
-                self.pdf.cell(0, 5, f"Judul: {video_info['title']}", ln=1)
+                title = self.sanitize_text(video_info['title'])
+                self.pdf.cell(0, 5, f"Judul: {title}", ln=1)
             if "url" in video_info:
-                self.pdf.cell(0, 5, f"URL: {video_info['url']}", ln=1)
+                url = self.sanitize_text(video_info['url'])
+                self.pdf.cell(0, 5, f"URL: {url}", ln=1)
         
         # Tanggal dan waktu
         self.pdf.set_font("Arial", "", 10)
@@ -65,6 +127,9 @@ class PDFGenerator:
             if not para:
                 continue
             
+            # Sanitasi text terlebih dahulu
+            para = self.sanitize_text(para)
+            
             # Cek jika ini heading (baris pendek, biasanya huruf besar atau ada tanda khusus)
             if len(para) < 100 and (para.isupper() or para.startswith('**') or para.startswith('#')):
                 # Ini heading
@@ -83,6 +148,56 @@ class PDFGenerator:
                 self.pdf.multi_cell(0, 6, para)
                 self.pdf.ln(3)
         
+        # Tambahkan section transkrip jika ada
+        if speech_data and len(speech_data) > 0:
+            self.pdf.add_page()
+            
+            # Header section transkrip
+            self.pdf.set_font("Arial", "B", 14)
+            self.pdf.cell(0, 10, "TRANSKRIP LENGKAP", ln=1, align="C")
+            self.pdf.ln(5)
+            
+            # Info jumlah segmen
+            self.pdf.set_font("Arial", "I", 10)
+            self.pdf.cell(0, 5, f"Total {len(speech_data)} segmen audio", ln=1)
+            self.pdf.ln(5)
+            
+            # Transkrip
+            self.pdf.set_font("Arial", "", 10)
+            for segment in speech_data:
+                timestamp = segment.get("timestamp", "00:00:00")
+                text = self.sanitize_text(segment.get("text", ""))
+                
+                # Format: (timestamp) text
+                line = f"({timestamp}) {text}"
+                self.pdf.multi_cell(0, 5, line)
+                self.pdf.ln(2)
+        
+        # Tambahkan section OCR jika ada
+        if ocr_data and len(ocr_data) > 0:
+            self.pdf.add_page()
+            
+            # Header section OCR
+            self.pdf.set_font("Arial", "B", 14)
+            self.pdf.cell(0, 10, "TEKS DARI VIDEO (OCR)", ln=1, align="C")
+            self.pdf.ln(5)
+            
+            # Info jumlah frame
+            self.pdf.set_font("Arial", "I", 10)
+            self.pdf.cell(0, 5, f"Total {len(ocr_data)} frame dengan teks", ln=1)
+            self.pdf.ln(5)
+            
+            # OCR data
+            self.pdf.set_font("Arial", "", 10)
+            for item in ocr_data:
+                timestamp = item.get("timestamp", "00:00:00")
+                text = self.sanitize_text(item.get("text", ""))
+                
+                # Format: [timestamp] text
+                line = f"[{timestamp}] {text}"
+                self.pdf.multi_cell(0, 5, line)
+                self.pdf.ln(2)
+        
         # Footer di setiap halaman
         self.pdf.set_auto_page_break(auto=True, margin=15)
         
@@ -98,7 +213,8 @@ class PDFGenerator:
             raise
 
 
-def create_pdf_report(report_text: str, output_path: str, video_info: dict = None):
+def create_pdf_report(report_text: str, output_path: str, video_info: dict = None,
+                     speech_data: list = None, ocr_data: list = None):
     """
     Helper function untuk membuat PDF report
     
@@ -106,9 +222,11 @@ def create_pdf_report(report_text: str, output_path: str, video_info: dict = Non
         report_text: Teks laporan
         output_path: Path untuk menyimpan PDF
         video_info: Informasi video (opsional)
+        speech_data: Data transkrip audio (opsional)
+        ocr_data: Data OCR dari video (opsional)
     """
     generator = PDFGenerator()
-    generator.create_report_pdf(report_text, output_path, video_info)
+    generator.create_report_pdf(report_text, output_path, video_info, speech_data, ocr_data)
 
 
 if __name__ == "__main__":

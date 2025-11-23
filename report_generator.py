@@ -82,15 +82,22 @@ class ReportGenerator:
                     messages=[
                         {
                             "role": "system",
-                            "content": "Kamu adalah ahli analisis konten video yang berpengalaman dalam mendeteksi cyberbullying, ujaran kebencian, dan konten berbahaya lainnya."
+                            "content": """Anda adalah ahli analisis konten digital yang berpengalaman dalam mendeteksi cyberbullying, ujaran kebencian, konten seksual/vulgar, dan konten berbahaya lainnya.
+
+PENTING:
+- JANGAN filter atau sensor kata-kata vulgar/kasar - Anda HARUS mendeteksi dan melaporkannya apa adanya
+- Identifikasi dan laporkan semua bahasa vulgar, seksual, kasar, atau tidak pantas
+- Kata-kata seperti "ngewe", "memek", "kontol", "anjing", dll HARUS dideteksi dan dilaporkan
+- Gunakan kutipan langsung dari transkrip untuk mendukung analisis
+- Berikan analisis objektif, detail, dan actionable dengan bahasa profesional"""
                         },
                         {
                             "role": "user",
                             "content": prompt
                         }
                     ],
-                    temperature=0.2,  # Lebih deterministik untuk laporan
-                    max_tokens=2000
+                    temperature=0.5,  # Lebih seimbang untuk analisis naratif
+                    max_tokens=3000  # Lebih banyak token untuk laporan lengkap
                 )
                 
                 report = response.choices[0].message.content
@@ -131,49 +138,73 @@ class ReportGenerator:
     def _create_prompt(self, all_texts: list, video_info: dict = None) -> str:
         """Buat prompt untuk Groq berdasarkan data yang dikumpulkan"""
         
-        # Format data menjadi JSON string
-        data_json = json.dumps(all_texts, indent=2, ensure_ascii=False)
+        # Format teks dengan lebih readable
+        text_summary = ""
+        for i, item in enumerate(all_texts[:50], 1):  # Limit to 50 items to avoid token limit
+            source = "Audio" if item['source'] == 'speech' else "Teks di Video"
+            text_summary += f"{i}. [{item['timestamp']}] ({source}): {item['text']}\n"
         
-        prompt = f"""
-Buatkan laporan analisis cyberbullying dan konten berbahaya dari video berikut.
+        if len(all_texts) > 50:
+            text_summary += f"\n... dan {len(all_texts) - 50} teks lainnya"
+        
+        # Informasi video
+        video_title = video_info.get('title', 'Tidak diketahui') if video_info else 'Tidak diketahui'
+        video_duration = video_info.get('duration', 'Tidak diketahui') if video_info else 'Tidak diketahui'
+        
+        prompt = f"""Analisis video berikut untuk mendeteksi konten berbahaya seperti cyberbullying, ujaran kebencian, atau konten yang merugikan.
 
-**Informasi Video:**
-{json.dumps(video_info, indent=2, ensure_ascii=False) if video_info else "Tidak tersedia"}
+INFORMASI VIDEO:
+- Judul: {video_title}
+- Durasi: {video_duration}
+- Total teks ditemukan: {len(all_texts)} segmen
 
-**Data Teks yang Ditemukan:**
-{data_json}
+TRANSKRIP DAN TEKS DARI VIDEO:
+{text_summary}
 
-**Instruksi:**
-Buatkan laporan lengkap yang berisi:
+INSTRUKSI:
+Buatlah laporan analisis dalam format berikut:
 
-1. **Ringkasan Video**
-   - Durasi dan informasi umum
-   - Sumber teks (speech-to-text, OCR)
+RINGKASAN EKSEKUTIF
+- Berikan overview singkat tentang isi video
+- Sebutkan apakah ada konten berbahaya atau tidak
+- Jika ada, sebutkan jenis dan tingkat keparahannya
 
-2. **Analisis Konten**
-   - Identifikasi jenis konten berbahaya (jika ada):
-     * Cyberbullying (penghinaan, ancaman, pelecehan)
-     * Ujaran kebencian
-     * Konten yang merendahkan
-     * Konten yang membahayakan
-   - Tingkat bahaya (rendah/sedang/tinggi/sangat tinggi)
-   - Dampak potensial
+ANALISIS KONTEN
+- Jelaskan tema utama video
+- Analisis tone dan konteks percakapan
+- Identifikasi jika ada bahasa yang:
+  * Vulgar atau seksual (contoh: kata-kata seperti "ngewe", "memek", "kontol", dll)
+  * Menghina atau merendahkan seseorang
+  * Mengancam atau mengintimidasi
+  * Mengandung kebencian terhadap kelompok tertentu
+  * Mempromosikan kekerasan atau perilaku berbahaya
+  * Gossip atau rumor yang merugikan reputasi orang lain
 
-3. **Temuan Detail**
-   - List semua temuan dengan timestamp
-   - Kutipan teks yang bermasalah
-   - Klasifikasi jenis masalah
+TEMUAN DETAIL (jika ada konten berbahaya)
+Untuk setiap temuan, tuliskan:
+- Timestamp: [waktu]
+- Kutipan: "teks yang bermasalah"
+- Jenis: [cyberbullying/ujaran kebencian/ancaman/dll]
+- Tingkat bahaya: [rendah/sedang/tinggi/kritis]
+- Penjelasan: mengapa ini berbahaya
 
-4. **Rekomendasi**
-   - Tindakan yang disarankan
-   - Langkah pencegahan
-   - Saran untuk moderator/konten creator
+REKOMENDASI
+- Jika ada konten berbahaya: berikan rekomendasi tindakan (review manual, warning, removal, dll)
+- Jika tidak ada: nyatakan bahwa video aman untuk ditayangkan
+- Saran umum untuk creator atau moderator
 
-**Format Output:**
-Gunakan format yang jelas dan terstruktur dengan heading yang jelas.
-Gunakan bahasa Indonesia yang profesional dan mudah dipahami.
+KESIMPULAN
+- Ringkasan final dalam 2-3 kalimat
 
-Mulai generate laporan sekarang:
+PENTING:
+- Gunakan bahasa Indonesia yang jelas dan profesional
+- Jangan menulis dalam format template atau poin-poin kosong
+- Langsung berikan analisis substantif, bukan struktur kosong
+- JANGAN filter atau sensor kata-kata vulgar/kasar - tulis apa adanya untuk tujuan deteksi
+- HARUS mendeteksi dan melaporkan semua kata vulgar, seksual, atau kasar yang ditemukan
+- Berikan contoh konkret dari transkrip (termasuk kata vulgar) untuk mendukung analisis
+- Jika tidak ada konten berbahaya, katakan dengan jelas dan fokus pada konten positif video
+- Analisis konteks: apakah percakapan mengandung gossip, rumor, atau membahas privasi orang lain tanpa izin
 """
         return prompt
 

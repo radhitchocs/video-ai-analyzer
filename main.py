@@ -58,20 +58,43 @@ def analyze_video(video_url: str, output_format: str = "all"):
         
         # Step 3: Speech-to-text dengan Whisper
         print("\n[3/5] 🎤 Speech-to-Text (Whisper)...")
-        try:
-            stt = SpeechToText(model_size="base")  # Bisa diganti ke 'small' atau 'medium' untuk akurasi lebih tinggi
-            speech_data = stt.transcribe(audio_path, language="id")
-        except Exception as e:
-            print(f"\n⚠️  Error saat load Whisper model: {str(e)}")
-            print("\n💡 Mencoba dengan model 'base' yang lebih kecil...")
+        
+        # Coba model dari yang paling akurat ke yang paling kecil
+        models_to_try = ["medium", "small", "base", "tiny"]
+        speech_data = None
+        
+        for model_size in models_to_try:
             try:
-                stt = SpeechToText(model_size="base")
-                speech_data = stt.transcribe(audio_path, language="id")
-            except Exception as e2:
-                print(f"\n❌ Masih error: {str(e2)}")
-                print("\n📝 Silakan download model secara manual:")
-                print("   python -c \"import whisper; whisper.load_model('base')\"")
-                raise
+                print(f"   Mencoba model: {model_size}")
+                stt = SpeechToText(model_size=model_size)
+                speech_data = stt.transcribe(audio_path, language="id", no_filter=True)
+                print(f"   ✅ Berhasil dengan model: {model_size}")
+                if model_size in ["tiny", "base"]:
+                    print(f"   ⚠️  Model '{model_size}' kurang akurat untuk kata slang/vulgar")
+                    print(f"   💡 Rekomendasi: download model 'medium' untuk akurasi maksimal")
+                    print(f"      Jalankan: python -c \"import whisper; whisper.load_model('medium')\"")
+                break
+            except Exception as e:
+                error_msg = str(e)
+                if "out of memory" in error_msg.lower() or "oom" in error_msg.lower():
+                    print(f"   ⚠️  Model {model_size} terlalu besar untuk RAM, coba model lebih kecil...")
+                    continue
+                elif model_size == models_to_try[-1]:
+                    # Model terakhir juga gagal
+                    print(f"\n❌ Semua model gagal. Error: {error_msg}")
+                    print("\n📝 Solusi:")
+                    print("   1. Download model secara manual:")
+                    print("      python -c \"import whisper; whisper.load_model('base')\"")
+                    print("   2. Cek koneksi internet")
+                    print("   3. Restart terminal dan coba lagi")
+                    raise
+                else:
+                    print(f"   ⚠️  Error dengan model {model_size}: {error_msg[:100]}...")
+                    print(f"   Mencoba model yang lebih kecil...")
+                    continue
+        
+        if speech_data is None:
+            raise Exception("Gagal melakukan transcribe dengan semua model")
         
         # Step 4: OCR dari frame video
         print("\n[4/5] 📸 OCR dari Frame Video...")
@@ -96,7 +119,7 @@ def analyze_video(video_url: str, output_format: str = "all"):
         # Simpan sebagai PDF
         if output_format in ["pdf", "all"]:
             pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
-            create_pdf_report(report_text, pdf_path, video_info)
+            create_pdf_report(report_text, pdf_path, video_info, speech_data, ocr_data)
         
         # Simpan sebagai JSON
         if output_format in ["json", "all"]:

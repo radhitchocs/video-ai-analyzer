@@ -13,7 +13,10 @@ class SpeechToText:
         
         Args:
             model_size: Ukuran model ('tiny', 'base', 'small', 'medium', 'large')
-                       Semakin besar, semakin akurat tapi lebih lambat
+                       - tiny/base: Cepat tapi kurang akurat, sering miss kata slang/vulgar
+                       - small: Balance antara speed dan akurasi
+                       - medium: Akurasi tinggi, direkomendasikan untuk deteksi kata sensitif
+                       - large: Paling akurat tapi lambat
             max_retries: Jumlah maksimal retry saat download model
         """
         print(f"🤖 Loading Whisper model: {model_size}")
@@ -62,13 +65,14 @@ class SpeechToText:
                     print("   4. Atau gunakan model yang lebih kecil (tiny) untuk test")
                     raise
     
-    def transcribe(self, audio_path: str, language: str = "id") -> list:
+    def transcribe(self, audio_path: str, language: str = "id", no_filter: bool = True) -> list:
         """
         Transcribe audio menjadi teks dengan timestamp
         
         Args:
             audio_path: Path ke file audio
             language: Bahasa audio (default: 'id' untuk Indonesia)
+            no_filter: Jika True, disable filtering kata vulgar (default: True)
             
         Returns:
             List of dict dengan format:
@@ -85,12 +89,26 @@ class SpeechToText:
         try:
             print(f"🎤 Transcribing audio: {audio_path}")
             
+            # Parameter untuk akurasi maksimal dan tanpa filtering
+            transcribe_options = {
+                "audio": audio_path,
+                "language": language,
+                "word_timestamps": True,
+                "verbose": False,
+            }
+            
+            # Disable suppression tokens (kata-kata yang biasa di-filter)
+            if no_filter:
+                # Set suppress_tokens ke empty list untuk disable filtering
+                transcribe_options["suppress_tokens"] = []
+                # Tambah initial_prompt untuk guide model agar tidak filter
+                transcribe_options["initial_prompt"] = (
+                    "Transkripsi percakapan informal dalam bahasa Indonesia. "
+                    "Tulis semua kata apa adanya tanpa filtering atau censoring."
+                )
+            
             # Transcribe dengan Whisper
-            result = self.model.transcribe(
-                audio_path,
-                language=language,
-                word_timestamps=True
-            )
+            result = self.model.transcribe(**transcribe_options)
             
             # Format hasil menjadi list dengan timestamp
             segments = []
