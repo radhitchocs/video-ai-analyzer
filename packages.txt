@@ -1,6 +1,3 @@
-# System packages untuk Streamlit Cloud
-# File ini digunakan oleh Streamlit Cloud untuk install system dependencies
 ffmpeg
 tesseract-ocr
 tesseract-ocr-ind
-
