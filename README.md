@@ -247,6 +247,30 @@ sudo apt-get install tesseract-ocr  # Linux
 - **Whisper**: Model akan di-cache setelah pertama kali download.
 - **File Sementara**: File di folder `downloads/` bisa dihapus setelah analisis selesai.
 
+## 🌐 Deployment (Deploy Gratis!)
+
+Aplikasi ini bisa di-deploy secara **GRATIS** ke berbagai platform cloud!
+
+📖 **Lihat panduan lengkap di [DEPLOYMENT.md](DEPLOYMENT.md)**
+
+### Platform yang Didukung:
+- ✅ **Streamlit Cloud** (Paling Mudah - Recommended)
+- ✅ **Railway.app**
+- ✅ **Render.com**
+- ✅ **Fly.io**
+
+Semua file konfigurasi sudah disediakan:
+- `Dockerfile` - untuk Railway, Render, Fly.io
+- `packages.txt` - untuk Streamlit Cloud
+- `render.yaml` - untuk Render auto-config
+- `.streamlit/config.toml` - konfigurasi Streamlit
+
+**Quick Start:**
+1. Push repo ke GitHub
+2. Buka [Streamlit Cloud](https://streamlit.io/cloud)
+3. Connect repo dan set environment variables
+4. Deploy! 🚀
+
 ## 🤝 Kontribusi
 
 Silakan buat issue atau pull request jika ada bug atau fitur baru!

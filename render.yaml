@@ -1,0 +1,18 @@
+# Render.com configuration
+services:
+  - type: web
+    name: video-ai-analyzer
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port=$PORT --server.address=0.0.0.0
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: mixtral-8x7b-32768
+      - key: DOWNLOADS_DIR
+        value: downloads
+      - key: OUTPUT_DIR
+        value: output
+    plan: free
+
