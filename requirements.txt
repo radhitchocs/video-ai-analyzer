@@ -7,3 +7,4 @@ pillow
 fpdf2
 python-dotenv
 ffmpeg-python
+streamlit
